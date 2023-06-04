@@ -324,58 +324,56 @@ public class TransactionProcessing {
         return null;
     }
 
-    public EWallet findEWalletByPhoneNumber(int phoneNumber) {
+    public Payment findPaymentByIdentify(int identify, int type) {
         for (Payment payment : paymentObjects) {
-            if (payment instanceof EWallet) {
-                if (((EWallet) payment).getPhoneNumber() == phoneNumber) {
-                    return ((EWallet) payment);
+            try {
+                switch (type) {
+                    case 1: {
+                        if (((EWallet) payment).getPhoneNumber() == identify) {
+                            return payment;
+                        } else {
+                            return null;
+                        }
+                    }
+                    case 2: {
+                        if (((BankAccount) payment).getStk() == identify) {
+                            return payment;
+                        } else {
+                            return null;
+                        }
+                    }
+                    case 3: {
+                        if (((ConvenientCard) payment).getID() == identify) {
+                            return payment;
+                        } else {
+                            return null;
+                        }
+                    }
                 }
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
             }
         }
         return null;
     }
 
-    public void upEWallet(IDCard idCard, double amount, String payFor) {
-        EWallet eWallet = findEWalletByPhoneNumber(idCard.getPhoneNumber());
-        if (eWallet != null) {
-            if (amount > 500) {
-                int age = idCard.getAge();
+    public double calAmountForEWallet(IDCard idCard, double amount, String payFor) {
+        if (amount > 500 && Objects.equals(payFor, "Clothing")) {
+            int age = idCard.getAge();
 
-                if (Objects.equals(idCard.getGender(), "Male") && age < 20 && Objects.equals(payFor, "Clothing")) {
-                    amount -= ((amount / 100) * 15);
-                } else if (Objects.equals(idCard.getGender(), "Female") && age < 18
-                        && Objects.equals(payFor, "Clothing")) {
-                    amount -= ((amount / 100) * 15);
-                }
+            if ((Objects.equals(idCard.getGender(), "Male") && age < 20)
+                    || (Objects.equals(idCard.getGender(), "Female") && age < 18)) {
+                amount -= amount * 0.15;
             }
-            payBill(amount, eWallet.getPhoneNumber(), 1);
         }
+        return amount;
     }
 
     public void payBill(double amount, int id, int type) {
-        for (Payment payment : paymentObjects) {
-            if (type == 1) {
-                // e-wallet
-                if (payment instanceof EWallet) {
-                    if (((EWallet) payment).getPhoneNumber() == id) {
-                        payment.pay(amount);
-                    }
-                }
-            } else if (type == 2) {
-                // bank account or card
-                if (payment instanceof BankAccount) {
-                    if (((BankAccount) payment).getStk() == id) {
-                        payment.pay(amount);
-                    }
-                }
-
-            } else if (type == 3) {
-                if (payment instanceof ConvenientCard) {
-                    if (((ConvenientCard) payment).getID() == id) {
-                        payment.pay(amount);
-                    }
-                }
-            }
+        Payment payment = findPaymentByIdentify(id, type);
+        if (payment != null) {
+            payment.pay(amount);
+            System.out.println(amount);
         }
     }
 
@@ -387,21 +385,23 @@ public class TransactionProcessing {
             String line;
             while ((line = bufferedReader.readLine()) != null) {
                 String[] lineStr = line.split(",");
+                double amount = Double.parseDouble(lineStr[1]);
+                int identify = Integer.parseInt(lineStr[4]);
                 switch (lineStr[3]) {
-                    case "BA":
-                        payBill(Double.parseDouble(lineStr[1]), Integer.parseInt(lineStr[4]), 2);
-                    case "CC":
-                        payBill(Double.parseDouble(lineStr[1]), Integer.parseInt(lineStr[4]), 3);
-                        break;
                     case "EW":
-                        IDCard idCard = findBySDT(Integer.parseInt(lineStr[4]));
+                        IDCard idCard = findBySDT(identify);
                         if (idCard != null) {
-                            upEWallet(idCard, Double.parseDouble(lineStr[1]), lineStr[2]);
+                            payBill(calAmountForEWallet(idCard, amount, lineStr[2]), identify, 1);
                         }
+                        break;
+                    case "BA":
+                        payBill(amount, identify, 2);
+                        break;
+                    case "CC":
+                        payBill(amount, identify, 3);
                         break;
                 }
             }
-
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
